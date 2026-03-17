@@ -46,11 +46,24 @@ def _get_plex() -> PlexServer:
 
 
 def _section_size_bytes(section) -> int:
-    """Sum the file sizes of every media item in a Plex library section."""
+    """
+    Sum the file sizes of every media file in a Plex library section.
+
+    section.all() returns top-level objects (Movie, Show, Artist).  Only
+    Movie/Episode/Track objects have .media[].parts[].size, so for show and
+    music sections we must fetch at the leaf level.
+    """
+    section_type = getattr(section, "type", "")
+    if section_type == "show":
+        items = section.all(libtype="episode")
+    elif section_type in ("artist", "music"):
+        items = section.all(libtype="track")
+    else:
+        items = section.all()   # movie, photo, etc.
+
     total = 0
-    for item in section.all():
+    for item in items:
         try:
-            # Most media types expose .media[].parts[].size
             for media in getattr(item, "media", []):
                 for part in getattr(media, "parts", []):
                     total += getattr(part, "size", 0) or 0
@@ -73,11 +86,37 @@ def _resolve_mount(path: str) -> str:
 
 def _collect_mounts(plex: PlexServer) -> set[str]:
     """
-    Derive mount points from Plex location paths.
-    Only includes paths that are accessible inside this container.
-    Falls back to {'/'} if nothing useful is found.
+    Return the set of mount points to snapshot disk usage for.
+
+    Priority order:
+      1. MONITOR_PATHS env var — comma-separated list of paths the user wants
+         to track (e.g. "/mnt/user,/mnt/cache").  These are used as-is if they
+         exist inside the container.
+      2. /mnt/user — the Unraid merged-array path, used automatically when
+         present (covers the common Unraid case without any config).
+      3. Plex library locations — only paths that are actually accessible
+         inside this container are included.
     """
-    mounts: set[str] = set()
+    # 1. Explicit env-var override
+    monitor_env = os.environ.get("MONITOR_PATHS", "").strip()
+    if monitor_env:
+        mounts: set[str] = set()
+        for raw in monitor_env.split(","):
+            path = raw.strip()
+            if path and os.path.exists(path):
+                mounts.add(_resolve_mount(path))
+            elif path:
+                log.warning("MONITOR_PATHS entry %r does not exist in container — skipping.", path)
+        if mounts:
+            return mounts
+
+    # 2. Unraid default: /mnt/user (merged array view)
+    if os.path.exists("/mnt/user"):
+        log.debug("Using /mnt/user as disk monitor target (Unraid default).")
+        return {_resolve_mount("/mnt/user")}
+
+    # 3. Derive from Plex library locations (only paths visible in this container)
+    mounts = set()
     try:
         for section in plex.library.sections():
             for location in section.locations:
@@ -93,11 +132,9 @@ def _collect_mounts(plex: PlexServer) -> set[str]:
 
     if not mounts:
         log.warning(
-            "No Plex library paths are accessible inside this container. "
-            "To monitor real disk usage on Unraid, add '/mnt:/mnt:ro' as a "
-            "volume in the Docker template and restart the container."
+            "No accessible disk paths found. Set the MONITOR_PATHS environment "
+            "variable (e.g. MONITOR_PATHS=/mnt/user) or mount /mnt into the container."
         )
-        return set()
 
     return mounts
 

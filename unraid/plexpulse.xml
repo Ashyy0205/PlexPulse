@@ -31,6 +31,10 @@
     Description="Optional. Leave blank to sign in via the UI OAuth flow instead."
     Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
 
+  <Config Name="Monitor Paths" Target="MONITOR_PATHS" Default="/mnt/user"
+    Description="Comma-separated list of paths to measure disk usage on. Default /mnt/user covers the full Unraid array. Add /mnt/cache to track your cache pool separately, e.g. /mnt/user,/mnt/cache"
+    Type="Variable" Display="always" Required="false" Mask="false">/mnt/user</Config>
+
   <Config Name="Collection Interval" Target="COLLECTION_INTERVAL" Default="6h"
     Description="How often to snapshot library stats. Options: 1h, 3h, 6h, 12h, 24h."
     Type="Variable" Display="always" Required="false" Mask="false">6h</Config>

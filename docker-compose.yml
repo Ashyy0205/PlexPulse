@@ -13,3 +13,4 @@ services:
       - PLEX_TOKEN=${PLEX_TOKEN}
       - COLLECTION_INTERVAL=${COLLECTION_INTERVAL:-6h}
       - TZ=${TZ:-UTC}
+      - MONITOR_PATHS=${MONITOR_PATHS:-/mnt/user}
