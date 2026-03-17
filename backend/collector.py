@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from plexapi.server import PlexServer
 from sqlalchemy.orm import Session
 
+from alerts import evaluate_alerts
 from database import SessionLocal
 from models import DiskSnapshot, Library, Snapshot
 
@@ -140,6 +141,13 @@ def collect() -> dict:
                 log.error("Failed to collect disk usage for %r: %s", mount, exc)
 
         db.commit()
+
+        # Evaluate alert rules against the freshly committed snapshot data.
+        # Wrapped separately so an alert failure never rolls back snapshot data.
+        try:
+            evaluate_alerts(db)
+        except Exception as exc:  # noqa: BLE001
+            log.error("Alert evaluation failed: %s", exc)
 
     except Exception as exc:  # noqa: BLE001
         log.error("Collection run failed: %s", exc)
