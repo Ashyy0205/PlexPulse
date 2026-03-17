@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from database import create_tables, get_db
 from models import Library, Snapshot
+from scheduler import start_scheduler, stop_scheduler
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
@@ -73,8 +74,13 @@ async def lifespan(app: FastAPI):
     else:
         log.warning("PLEX_URL or PLEX_TOKEN not set — skipping Plex connection.")
 
+    # 5. Start the collection scheduler
+    start_scheduler()
+
     yield
-    # Shutdown — nothing to clean up yet
+
+    # Shutdown
+    stop_scheduler()
 
 
 app = FastAPI(title="PlexPulse", version="0.1.0", lifespan=lifespan)
