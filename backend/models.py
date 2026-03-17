@@ -8,6 +8,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
+    Text,
 )
 from sqlalchemy.orm import DeclarativeBase, relationship
 
@@ -73,4 +74,13 @@ class Alert(Base):
     destination = Column(String, nullable=False)
     enabled = Column(Boolean, nullable=False, default=True)
     last_triggered_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class AlertLog(Base):
+    __tablename__ = "alert_logs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    alert_id = Column(Integer, ForeignKey("alerts.id", ondelete="SET NULL"), nullable=True)
+    triggered_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    message = Column(Text, nullable=False)
 

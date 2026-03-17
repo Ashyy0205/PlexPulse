@@ -5,3 +5,4 @@ plexapi
 apscheduler
 numpy
 scipy
+httpx

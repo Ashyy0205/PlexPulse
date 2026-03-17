@@ -10,17 +10,16 @@ from sqlalchemy.orm import Session
 
 from database import create_tables, get_db
 from models import Library, Snapshot
+import plex_state
 from routers.libraries import router as libraries_router
 from routers.disk import router as disk_router
 from routers.summary import router as summary_router
+from routers.settings import router as settings_router
+from routers.alerts import router as alerts_router
 from scheduler import start_scheduler, stop_scheduler
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
-
-# Module-level Plex state
-_plex: PlexServer | None = None
-_plex_connected: bool = False
 
 
 def _upsert_libraries(plex: PlexServer, db: Session) -> int:
@@ -58,14 +57,14 @@ async def lifespan(app: FastAPI):
     # 3. Connect to Plex
     if plex_url and plex_token:
         try:
-            _plex = PlexServer(plex_url, plex_token)
-            _plex_connected = True
-            log.info("Connected to Plex server: %s (version %s)", _plex.friendlyName, _plex.version)
+            server = PlexServer(plex_url, plex_token)
+            plex_state.set_connection(server, True)
+            log.info("Connected to Plex server: %s (version %s)", server.friendlyName, server.version)
 
             # 4. Discover and upsert libraries
             db = next(get_db())
             try:
-                count = _upsert_libraries(_plex, db)
+                count = _upsert_libraries(server, db)
                 log.info("Found %d Plex librar%s.", count, "ies" if count != 1 else "y")
             finally:
                 db.close()
@@ -91,21 +90,24 @@ app = FastAPI(title="PlexPulse", version="0.1.0", lifespan=lifespan)
 app.include_router(libraries_router)
 app.include_router(disk_router)
 app.include_router(summary_router)
+app.include_router(settings_router)
+app.include_router(alerts_router)
 
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "plex_connected": _plex_connected}
+    return {"status": "ok", "plex_connected": plex_state.is_connected()}
 
 
 @app.get("/api/v1/status")
 def status(db: Session = Depends(get_db)):
     library_count = db.query(Library).count()
     snapshot_taken = db.query(Snapshot).first() is not None
+    server = plex_state.get_plex()
 
     return {
-        "server_name": _plex.friendlyName if _plex else None,
-        "plex_version": _plex.version if _plex else None,
+        "server_name": server.friendlyName if server else None,
+        "plex_version": server.version if server else None,
         "library_count": library_count,
         "snapshot_collected": snapshot_taken,
     }
