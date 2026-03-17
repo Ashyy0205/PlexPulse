@@ -74,17 +74,32 @@ def _resolve_mount(path: str) -> str:
 def _collect_mounts(plex: PlexServer) -> set[str]:
     """
     Derive mount points from Plex location paths.
+    Only includes paths that are accessible inside this container.
     Falls back to {'/'} if nothing useful is found.
     """
     mounts: set[str] = set()
     try:
         for section in plex.library.sections():
             for location in section.locations:
-                mounts.add(_resolve_mount(location))
+                if os.path.exists(location):
+                    mounts.add(_resolve_mount(location))
+                else:
+                    log.debug(
+                        "Plex location %r not accessible in container — skipping.",
+                        location,
+                    )
     except Exception as exc:  # noqa: BLE001
         log.warning("Could not read library locations: %s", exc)
 
-    return mounts or {"/"}
+    if not mounts:
+        log.warning(
+            "No Plex library paths are accessible inside this container. "
+            "To monitor real disk usage on Unraid, add '/mnt:/mnt:ro' as a "
+            "volume in the Docker template and restart the container."
+        )
+        return set()
+
+    return mounts
 
 
 def collect() -> dict:
@@ -112,12 +127,21 @@ def collect() -> dict:
 
                 lib = db.query(Library).filter_by(plex_library_key=str(section.key)).first()
                 if lib is None:
-                    log.warning(
-                        "Library key %s (%s) not in DB — skipping snapshot.",
+                    # Library exists in Plex but not in DB (e.g. startup connection
+                    # failed). Create it now so the snapshot is not lost.
+                    log.info(
+                        "Auto-registering library key %s (%s) into DB.",
                         section.key,
                         section.title,
                     )
-                    continue
+                    lib = Library(
+                        plex_library_key=str(section.key),
+                        name=section.title,
+                        type=section.type,
+                        created_at=datetime.now(timezone.utc),
+                    )
+                    db.add(lib)
+                    db.flush()  # populate lib.id before creating snapshot
 
                 snapshot = Snapshot(
                     library_id=lib.id,

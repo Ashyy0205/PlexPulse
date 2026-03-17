@@ -57,7 +57,13 @@ async def lifespan(app: FastAPI):
     log.info("Database tables ready.")
 
     # 2. Resolve credentials — env vars take priority, fall back to DB
-    plex_url_env   = os.environ.get("PLEX_URL",   "").rstrip("/")
+    def _normalise_url(url: str) -> str:
+        url = url.strip()
+        if url and not url.startswith(("http://", "https://")):
+            url = "http://" + url
+        return url.rstrip("/")
+
+    plex_url_env   = _normalise_url(os.environ.get("PLEX_URL",   ""))
     plex_token_env = os.environ.get("PLEX_TOKEN", "")
 
     db_init = next(get_db())
@@ -82,7 +88,7 @@ async def lifespan(app: FastAPI):
         plex_token = plex_token_env
         if not plex_url:
             row = db_init.query(Setting).filter(Setting.key == "PLEX_URL").first()
-            plex_url = (row.value or "").rstrip("/") if row else ""
+            plex_url = _normalise_url(row.value or "") if row else ""
         if not plex_token:
             row = db_init.query(Setting).filter(Setting.key == "PLEX_TOKEN").first()
             plex_token = row.value or "" if row else ""

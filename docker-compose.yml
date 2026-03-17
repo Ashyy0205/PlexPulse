@@ -7,6 +7,7 @@ services:
       - "6262:6262"
     volumes:
       - ./data:/data
+      - /mnt:/mnt:ro
     environment:
       - PLEX_URL=${PLEX_URL}
       - PLEX_TOKEN=${PLEX_TOKEN}

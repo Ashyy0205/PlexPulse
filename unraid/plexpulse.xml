@@ -19,6 +19,10 @@
     Description="Persistent storage for the PlexPulse database. Use your appdata share."
     Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/plexpulse</Config>
 
+  <Config Name="Media Path" Target="/mnt" Default="/mnt" Mode="ro"
+    Description="Read-only bind of your Unraid /mnt so PlexPulse can measure real disk usage on your array and cache. Do not change this."
+    Type="Path" Display="always" Required="true" Mask="false">/mnt</Config>
+
   <Config Name="Plex Server URL" Target="PLEX_URL" Default=""
     Description="Optional. e.g. http://192.168.1.50:32400 — leave blank to set via the UI instead. Do not use localhost if Plex is on the same machine, use the LAN IP."
     Type="Variable" Display="always" Required="false" Mask="false"></Config>
