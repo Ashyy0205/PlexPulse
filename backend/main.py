@@ -3,13 +3,16 @@ import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
-from fastapi import Depends, FastAPI
+from urllib.parse import urlparse
+
+from fastapi import Depends, FastAPI, HTTPException
 from plexapi.exceptions import Unauthorized
 from plexapi.server import PlexServer
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from database import create_tables, get_db
-from models import Library, Snapshot
+from models import DiskSnapshot, Library, Snapshot
 import plex_state
 from routers.libraries import router as libraries_router
 from routers.disk import router as disk_router
@@ -111,4 +114,37 @@ def status(db: Session = Depends(get_db)):
         "library_count": library_count,
         "snapshot_collected": snapshot_taken,
     }
+
+
+@app.get("/api/v1/stats")
+def get_stats(db: Session = Depends(get_db)):
+    snapshot_count = db.query(Snapshot).count()
+    disk_snapshot_count = db.query(DiskSnapshot).count()
+    db_path = "/data/plexpulse.db"
+    db_size = os.path.getsize(db_path) if os.path.exists(db_path) else 0
+    return {
+        "snapshot_count": snapshot_count + disk_snapshot_count,
+        "db_size_bytes": db_size,
+    }
+
+
+class _TestConnectionBody(BaseModel):
+    plex_url: str
+    plex_token: str
+
+
+@app.post("/api/v1/test-connection")
+def test_plex_connection(body: _TestConnectionBody):
+    parsed = urlparse(body.plex_url)
+    if parsed.scheme not in ("http", "https"):
+        raise HTTPException(status_code=400, detail="PLEX_URL must use http or https.")
+    if not parsed.netloc:
+        raise HTTPException(status_code=400, detail="PLEX_URL is not a valid URL.")
+    try:
+        server = PlexServer(body.plex_url.rstrip("/"), body.plex_token)
+        return {"ok": True, "server_name": server.friendlyName, "version": server.version}
+    except Unauthorized:
+        return {"ok": False, "detail": "Invalid Plex token."}
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "detail": str(exc)}
 
