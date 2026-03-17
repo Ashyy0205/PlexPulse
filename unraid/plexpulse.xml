@@ -7,11 +7,11 @@
   <Shell>bash</Shell>
   <Privileged>false</Privileged>
   <Overview>Self-hosted analytics dashboard for Plex Media Server. Track library growth, storage usage, and get a forecast of when you need more drives. Sign in with Plex directly from the UI.</Overview>
-  <WebUI>http://[IP]:[PORT:7878]</WebUI>
+  <WebUI>http://[IP]:[PORT:6262]</WebUI>
   <Icon>https://raw.githubusercontent.com/ashyy0205/plexpulse/main/unraid/plexpulse-icon.png</Icon>
   <ExtraParams>--restart=unless-stopped</ExtraParams>
 
-  <Config Name="Web UI Port" Target="7878" Default="7878" Mode="tcp"
+  <Config Name="Web UI Port" Target="6262" Default="6262" Mode="tcp"
     Description="Port for the PlexPulse web interface."
     Type="Port" Display="always" Required="true" Mask="false">7878</Config>
 
