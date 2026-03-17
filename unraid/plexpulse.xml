@@ -13,7 +13,7 @@
 
   <Config Name="Web UI Port" Target="6262" Default="6262" Mode="tcp"
     Description="Port for the PlexPulse web interface."
-    Type="Port" Display="always" Required="true" Mask="false">7878</Config>
+    Type="Port" Display="always" Required="true" Mask="false">6262</Config>
 
   <Config Name="Data Path" Target="/data" Default="/mnt/user/appdata/plexpulse" Mode="rw"
     Description="Persistent storage for the PlexPulse database. Use your appdata share."

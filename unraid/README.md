@@ -7,7 +7,7 @@ Click Install, review the settings below, then click Apply.
 
 ## Settings
 
-**Web UI Port** — leave as 7878 unless something else is already using that port on your Unraid server.
+**Web UI Port** — leave as 6262 unless something else is already using that port on your Unraid server.
 
 **Data Path** — leave as the default /mnt/user/appdata/plexpulse.
 This is where the database lives. Back this folder up if you want to

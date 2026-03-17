@@ -22,6 +22,6 @@ COPY backend/ .
 # Copy the compiled React app so FastAPI can serve it
 COPY --from=frontend-builder /frontend/dist ./static
 
-EXPOSE 7878
+EXPOSE 6262
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7878"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "6262"]

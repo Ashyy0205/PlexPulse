@@ -4,7 +4,7 @@ services:
     container_name: plexpulse
     restart: unless-stopped
     ports:
-      - "7878:7878"
+      - "6262:6262"
     volumes:
       - ./data:/data
     environment:
