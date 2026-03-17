@@ -15,12 +15,12 @@ from sqlalchemy.orm import Session
 from starlette.requests import Request
 
 from database import create_tables, get_db
-from models import DiskSnapshot, Library, Snapshot
+from models import DiskSnapshot, Library, Setting, Snapshot
 import plex_state
 from routers.libraries import router as libraries_router
 from routers.disk import router as disk_router
 from routers.summary import router as summary_router
-from routers.settings import router as settings_router
+from routers.settings import router as settings_router, auth_router
 from routers.alerts import router as alerts_router
 from scheduler import start_scheduler, stop_scheduler
 
@@ -56,9 +56,38 @@ async def lifespan(app: FastAPI):
     create_tables()
     log.info("Database tables ready.")
 
-    # 2. Read env vars
-    plex_url = os.environ.get("PLEX_URL", "").rstrip("/")
-    plex_token = os.environ.get("PLEX_TOKEN", "")
+    # 2. Resolve credentials — env vars take priority, fall back to DB
+    plex_url_env   = os.environ.get("PLEX_URL",   "").rstrip("/")
+    plex_token_env = os.environ.get("PLEX_TOKEN", "")
+
+    db_init = next(get_db())
+    try:
+        def _db_upsert(key: str, value: str) -> None:
+            row = db_init.query(Setting).filter(Setting.key == key).first()
+            if row:
+                row.value = value
+            else:
+                db_init.add(Setting(key=key, value=value))
+
+        # Persist env-var values to DB so the frontend OAuth UI sees them
+        if plex_url_env:
+            _db_upsert("PLEX_URL", plex_url_env)
+            db_init.commit()
+        if plex_token_env:
+            _db_upsert("PLEX_TOKEN", plex_token_env)
+            db_init.commit()
+
+        # If env vars absent, read from DB (set via OAuth)
+        plex_url   = plex_url_env
+        plex_token = plex_token_env
+        if not plex_url:
+            row = db_init.query(Setting).filter(Setting.key == "PLEX_URL").first()
+            plex_url = (row.value or "").rstrip("/") if row else ""
+        if not plex_token:
+            row = db_init.query(Setting).filter(Setting.key == "PLEX_TOKEN").first()
+            plex_token = row.value or "" if row else ""
+    finally:
+        db_init.close()
 
     # 3. Connect to Plex
     if plex_url and plex_token:
@@ -66,6 +95,18 @@ async def lifespan(app: FastAPI):
             server = PlexServer(plex_url, plex_token)
             plex_state.set_connection(server, True)
             log.info("Connected to Plex server: %s (version %s)", server.friendlyName, server.version)
+
+            # Persist server name so the Settings UI can display it
+            db_sn = next(get_db())
+            try:
+                row = db_sn.query(Setting).filter(Setting.key == "PLEX_SERVER_NAME").first()
+                if row:
+                    row.value = server.friendlyName
+                else:
+                    db_sn.add(Setting(key="PLEX_SERVER_NAME", value=server.friendlyName))
+                db_sn.commit()
+            finally:
+                db_sn.close()
 
             # 4. Discover and upsert libraries
             db = next(get_db())
@@ -80,7 +121,7 @@ async def lifespan(app: FastAPI):
         except Exception as exc:  # noqa: BLE001
             log.error("Plex connection failed: %s", exc)
     else:
-        log.warning("PLEX_URL or PLEX_TOKEN not set — skipping Plex connection.")
+        log.info("No Plex token configured — waiting for OAuth setup via UI.")
 
     # 5. Start the collection scheduler
     start_scheduler()
@@ -110,6 +151,7 @@ app.include_router(libraries_router)
 app.include_router(disk_router)
 app.include_router(summary_router)
 app.include_router(settings_router)
+app.include_router(auth_router)
 app.include_router(alerts_router)
 
 

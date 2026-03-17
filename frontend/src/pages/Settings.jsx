@@ -1,5 +1,4 @@
-import { useState, useEffect } from 'react'
-import axios from 'axios'
+import { useState, useEffect, useRef } from 'react'
 import client from '../hooks/useApi'
 import { useToast } from '../components/Toast'
 
@@ -105,17 +104,33 @@ function StatusPill({ status }) {
 export default function Settings() {
   const [form, setForm] = useState({
     PLEX_URL:            '',
-    PLEX_TOKEN:          '',
     COLLECTION_INTERVAL: '6h',
     RETENTION_MONTHS:    '12',
   })
-  const [tokenChanged,    setTokenChanged]    = useState(false)
   const [stats,           setStats]           = useState(null)
   const [loading,         setLoading]         = useState(true)
   const [saveStatus,      setSaveStatus]      = useState(null)
-  const [testStatus,      setTestStatus]      = useState(null)
   const [collectStatus,   setCollectStatus]   = useState(null)
+
+  // OAuth flow state
+  const [plexAuthState, setPlexAuthState] = useState('disconnected') // 'disconnected' | 'waiting' | 'connected'
+  const [serverName,    setServerName]    = useState('')
+  const [maskedToken,   setMaskedToken]   = useState('')
+  const pollRef      = useRef(null)
+  const pollCountRef = useRef(0)
+
   const addToast = useToast()
+
+  // Stop polling (safe to call multiple times)
+  const stopPolling = () => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current)
+      pollRef.current = null
+    }
+  }
+
+  // Clear polling on unmount
+  useEffect(() => () => stopPolling(), [])
 
   useEffect(() => {
     Promise.all([
@@ -125,57 +140,81 @@ export default function Settings() {
       const s = settingsData.settings || {}
       setForm({
         PLEX_URL:            s.PLEX_URL            || '',
-        PLEX_TOKEN:          '',          // never pre-fill with masked token
         COLLECTION_INTERVAL: s.COLLECTION_INTERVAL || '6h',
         RETENTION_MONTHS:    s.RETENTION_MONTHS    || '12',
       })
       setStats(statsData)
+      if (s.PLEX_TOKEN) {
+        setPlexAuthState('connected')
+        setMaskedToken(s.PLEX_TOKEN)
+        setServerName(s.PLEX_SERVER_NAME || '')
+      }
       setLoading(false)
     })
   }, [])
 
-  const set = (key, val) => {
-    setForm(f => ({ ...f, [key]: val }))
-    if (key === 'PLEX_TOKEN') setTokenChanged(true)
+  const set = (key, val) => setForm(f => ({ ...f, [key]: val }))
+
+  const handlePlexSignIn = async () => {
+    if (!form.PLEX_URL.trim()) {
+      addToast('Enter the Plex server URL first', 'error')
+      return
+    }
+    try {
+      // Save URL to DB before starting OAAuth so poll endpoint can use it
+      await client.put('/settings', { settings: { PLEX_URL: form.PLEX_URL } })
+      const res = await client.post('/auth/plex/start')
+      window.open(res.data.auth_url, '_blank', 'noopener,noreferrer')
+      setPlexAuthState('waiting')
+      // Start polling every 3 seconds; auto-stop after 5 minutes (100 polls)
+      pollCountRef.current = 0
+      pollRef.current = setInterval(async () => {
+        pollCountRef.current += 1
+        if (pollCountRef.current > 100) {
+          stopPolling()
+          setPlexAuthState('disconnected')
+          addToast('Sign-in timed out after 5 minutes. Please try again.', 'error')
+          return
+        }
+        try {
+          const r = await client.get('/auth/plex/poll')
+          if (r.data.authenticated) {
+            stopPolling()
+            setPlexAuthState('connected')
+            setServerName(r.data.server_name || '')
+            setMaskedToken(r.data.masked_token || '')
+            addToast(`Connected to ${r.data.server_name || 'Plex'}`, 'success')
+          } else if (r.data.expired) {
+            stopPolling()
+            setPlexAuthState('disconnected')
+            addToast('The sign-in window expired. Please try again.', 'error')
+          }
+        } catch {
+          // ignore transient poll errors
+        }
+      }, 3000)
+    } catch (e) {
+      addToast('Failed to start Plex sign-in: ' + (e?.response?.data?.detail ?? e.message), 'error')
+    }
   }
 
-  const handleTestConnection = async () => {
-    setTestStatus('testing')
-    if (form.PLEX_URL && form.PLEX_TOKEN) {
-      try {
-        const res = await client.post('/test-connection', {
-          plex_url:   form.PLEX_URL,
-          plex_token: form.PLEX_TOKEN,
-        })
-        setTestStatus(res.data)
-      } catch (e) {
-        setTestStatus({ ok: false, detail: e?.response?.data?.detail ?? e.message })
-      }
-    } else {
-      // No new creds entered — check current live status
-      try {
-        const res = await axios.get('/health')
-        setTestStatus({
-          ok:          res.data.plex_connected,
-          server_name: undefined,
-          detail:      res.data.plex_connected ? undefined : 'Plex is offline. Enter URL and Token to test new credentials.',
-        })
-      } catch {
-        setTestStatus({ ok: false, detail: 'Could not reach backend.' })
-      }
+  const handleDisconnect = async () => {
+    try {
+      await client.post('/auth/plex/disconnect')
+      setPlexAuthState('disconnected')
+      setServerName('')
+      setMaskedToken('')
+    } catch (e) {
+      addToast('Disconnect failed: ' + (e?.response?.data?.detail ?? e.message), 'error')
     }
   }
 
   const handleSave = async () => {
     setSaveStatus('saving')
-    setTestStatus(null)
     const payload = {
       PLEX_URL:            form.PLEX_URL,
       COLLECTION_INTERVAL: form.COLLECTION_INTERVAL,
       RETENTION_MONTHS:    form.RETENTION_MONTHS,
-    }
-    if (tokenChanged && form.PLEX_TOKEN) {
-      payload.PLEX_TOKEN = form.PLEX_TOKEN
     }
     try {
       const res = await client.put('/settings', { settings: payload })
@@ -187,7 +226,6 @@ export default function Settings() {
         setSaveStatus('ok')
         addToast('Settings saved', 'success')
       }
-      setTokenChanged(false)
       setTimeout(() => setSaveStatus(null), 4000)
     } catch (e) {
       setSaveStatus({ error: e?.response?.data?.detail ?? e.message })
@@ -235,29 +273,58 @@ export default function Settings() {
             value={form.PLEX_URL}
             onChange={v => set('PLEX_URL', v)}
             placeholder="http://192.168.1.100:32400"
+            disabled={plexAuthState === 'waiting'}
           />
         </Field>
 
-        <Field label="Plex Token" hint="Leave blank to keep the existing token unchanged">
-          <TextInput
-            type="password"
-            value={form.PLEX_TOKEN}
-            onChange={v => set('PLEX_TOKEN', v)}
-            placeholder="Enter new token to update"
-            autoComplete="new-password"
-          />
-        </Field>
+        {/* Disconnected — sign-in button */}
+        {plexAuthState === 'disconnected' && (
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handlePlexSignIn}
+              className="px-4 py-2 rounded-lg text-sm font-semibold cursor-pointer transition-colors flex items-center gap-2"
+              style={{ background: T.accent, color: '#000' }}>
+              Sign in with Plex
+            </button>
+          </div>
+        )}
 
-        <div className="flex items-center gap-3 flex-wrap">
-          <button
-            onClick={handleTestConnection}
-            disabled={testStatus === 'testing'}
-            className="px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer disabled:opacity-50"
-            style={{ background: T.border, color: T.textPrimary }}>
-            Test Connection
-          </button>
-          <StatusPill status={testStatus} />
-        </div>
+        {/* Waiting — spinner + cancel */}
+        {plexAuthState === 'waiting' && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-sm" style={{ color: T.textMuted }}>
+              <span className="inline-block animate-spin">&#8635;</span>
+              Waiting for Plex authorisation — complete sign-in in the tab that opened
+            </div>
+            <button
+              onClick={() => { stopPolling(); setPlexAuthState('disconnected') }}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer"
+              style={{ background: T.border, color: T.textPrimary }}>
+              Cancel
+            </button>
+          </div>
+        )}
+
+        {/* Connected — status + disconnect */}
+        {plexAuthState === 'connected' && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-sm font-medium" style={{ color: '#22c55e' }}>
+              <span>&#9679;</span>
+              Connected{serverName ? ` to ${serverName}` : ''}
+            </div>
+            {maskedToken && (
+              <p className="text-xs font-mono" style={{ color: T.textMuted }}>
+                Token: {maskedToken}
+              </p>
+            )}
+            <button
+              onClick={handleDisconnect}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer"
+              style={{ background: T.border, color: '#f87171', border: '1px solid #ef444450' }}>
+              Disconnect
+            </button>
+          </div>
+        )}
       </SectionCard>
 
       {/* 2 — Collection */}

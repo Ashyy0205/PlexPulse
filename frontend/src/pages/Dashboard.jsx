@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { Link } from 'react-router-dom'
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -448,6 +449,8 @@ function Empty({ children }) {
 // ── Dashboard ────────────────────────────────────────────────────────────────
 export default function Dashboard() {
   const { data: summary, loading, error, refetch } = useGet('/summary')
+  const { data: settingsData }                      = useGet('/settings')
+  const plexConfigured = !!settingsData?.settings?.PLEX_TOKEN
   const [range,            setRange]            = useState('6m')
   const [librarySnapshots, setLibrarySnapshots] = useState({})
   const [diskSnapshots,    setDiskSnapshots]    = useState([])
@@ -535,10 +538,27 @@ export default function Dashboard() {
   const { libraries = [], disk_mounts = [], primary_mount_forecast, days_remaining } = summary
 
   const hasData = disk_mounts.length > 0 || libraries.some(l => l.item_count != null)
+
+  const NotConnectedBanner = () => (
+    <div className="rounded-xl px-5 py-4 flex items-center justify-between gap-4 flex-wrap"
+      style={{ background: '#e5a00d18', border: `1px solid ${T.accent}60` }}>
+      <p className="text-sm" style={{ color: T.textPrimary }}>
+        Plex not connected — go to Settings to sign in with your Plex account
+      </p>
+      <Link
+        to="/settings"
+        className="px-3 py-1.5 rounded-lg text-xs font-semibold flex-shrink-0"
+        style={{ background: T.accent, color: '#000' }}>
+        Go to Settings
+      </Link>
+    </div>
+  )
   if (!hasData) {
     return (
-      <div className="rounded-xl p-10 flex flex-col items-center gap-5 text-center"
-        style={{ background: T.card, border: `1px solid ${T.border}` }}>
+      <div className="space-y-4">
+        {settingsData && !plexConfigured && <NotConnectedBanner />}
+        <div className="rounded-xl p-10 flex flex-col items-center gap-5 text-center"
+          style={{ background: T.card, border: `1px solid ${T.border}` }}>
         <div className="text-4xl">📦</div>
         <div className="space-y-2">
           <h3 className="text-lg font-semibold" style={{ color: T.textPrimary }}>No snapshots yet</h3>
@@ -553,6 +573,7 @@ export default function Dashboard() {
           style={{ background: T.accent, color: '#000' }}>
           {collectingNow ? '⟳ Running…' : 'Run Collection Now'}
         </button>
+        </div>
       </div>
     )
   }
@@ -580,6 +601,7 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-5">
+      {settingsData && !plexConfigured && <NotConnectedBanner />}
       {/* 1 — Stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard title="Movies"    value={(movies?.item_count ?? 0).toLocaleString()} sub={monthlyItemsSub(movies)} />
