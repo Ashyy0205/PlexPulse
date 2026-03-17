@@ -1,0 +1,14 @@
+services:
+  plexpulse:
+    build: .
+    container_name: plexpulse
+    restart: unless-stopped
+    ports:
+      - "7878:7878"
+    volumes:
+      - ./data:/data
+    environment:
+      - PLEX_URL=${PLEX_URL}
+      - PLEX_TOKEN=${PLEX_TOKEN}
+      - COLLECTION_INTERVAL=${COLLECTION_INTERVAL:-6h}
+      - TZ=${TZ:-UTC}
