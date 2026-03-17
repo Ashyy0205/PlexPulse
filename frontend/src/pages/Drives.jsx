@@ -59,6 +59,19 @@ function fillBarColor(pct) {
   return '#22c55e'
 }
 
+// Convert a mount path to a friendly label.
+// /mnt/disk1 → "Disk 1", /mnt/disk12 → "Disk 12"
+// /mnt/cache → "Cache"
+// /mnt/user  → "Array (merged)"
+// anything else → last path segment
+function fmtMountName(path) {
+  const diskMatch = path.match(/^\/mnt\/disk(\d+)$/)
+  if (diskMatch) return `Disk ${diskMatch[1]}`
+  if (path === '/mnt/cache') return 'Cache'
+  if (path === '/mnt/user')  return 'Array (merged)'
+  return path.split('/').filter(Boolean).pop() || path
+}
+
 // ── Skeleton ───────────────────────────────────────────────────────────────────
 function Sk({ className = '' }) {
   return <div className={`animate-pulse rounded bg-[#1e1e24] ${className}`} />
@@ -101,9 +114,14 @@ function MountCard({ mount }) {
 
       {/* Header */}
       <div className="flex items-center justify-between gap-2">
-        <span className="font-mono text-sm font-semibold truncate" style={{ color: T.textPrimary }}>
-          {mount.mount_point}
-        </span>
+        <div className="min-w-0">
+          <div className="text-sm font-semibold" style={{ color: T.textPrimary }}>
+            {fmtMountName(mount.mount_point)}
+          </div>
+          <div className="text-xs font-mono truncate" style={{ color: T.textMuted }}>
+            {mount.mount_point}
+          </div>
+        </div>
         <span className="text-sm font-bold tabular-nums flex-shrink-0" style={{ color }}>
           {pct.toFixed(1)}%
         </span>

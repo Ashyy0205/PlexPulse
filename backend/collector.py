@@ -112,8 +112,9 @@ def _collect_mounts(plex: PlexServer) -> set[str]:
     #    glob returns e.g. ["/mnt/disk1", "/mnt/disk2", "/mnt/disk3"]
     #    Only include paths that are actual mount points (formatted, spun-up disks).
     #    Parity drives have no filesystem and do not appear under /mnt/disk*.
+    #    /mnt/disks (external/unassigned devices) is explicitly excluded.
     unraid_disks = sorted(
-        p for p in glob.glob("/mnt/disk*") if os.path.ismount(p)
+        p for p in glob.glob("/mnt/disk[0-9]*") if os.path.ismount(p)
     )
     if unraid_disks:
         log.debug("Unraid array disks detected: %s", unraid_disks)
@@ -218,6 +219,10 @@ def collect() -> dict:
         for mount in sorted(mounts):
             try:
                 usage = shutil.disk_usage(mount)
+                # Skip unformatted / unspun / empty volumes (e.g. /mnt/disks)
+                if usage.total == 0:
+                    log.debug("Skipping %r — reports 0 bytes total.", mount)
+                    continue
                 disk_snap = DiskSnapshot(
                     mount_point=mount,
                     captured_at=collected_at,
