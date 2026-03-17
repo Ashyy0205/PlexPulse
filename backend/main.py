@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from database import create_tables, get_db
 from models import Library, Snapshot
 from routers.libraries import router as libraries_router
+from routers.disk import router as disk_router
 from scheduler import start_scheduler, stop_scheduler
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -87,6 +88,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="PlexPulse", version="0.1.0", lifespan=lifespan)
 
 app.include_router(libraries_router)
+app.include_router(disk_router)
 
 
 @app.get("/health")
