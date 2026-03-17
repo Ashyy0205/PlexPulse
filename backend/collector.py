@@ -8,14 +8,40 @@ from sqlalchemy.orm import Session
 
 from alerts import evaluate_alerts
 from database import SessionLocal
-from models import DiskSnapshot, Library, Snapshot
+from models import DiskSnapshot, Library, Setting, Snapshot
 
 log = logging.getLogger(__name__)
 
 
+def _normalise_url(url: str) -> str:
+    """Prepend http:// if the URL has no scheme."""
+    url = url.strip()
+    if url and not url.startswith(("http://", "https://")):
+        url = "http://" + url
+    return url.rstrip("/")
+
+
 def _get_plex() -> PlexServer:
-    plex_url = os.environ["PLEX_URL"].rstrip("/")
-    plex_token = os.environ["PLEX_TOKEN"]
+    plex_url   = _normalise_url(os.environ.get("PLEX_URL", ""))
+    plex_token = os.environ.get("PLEX_TOKEN", "")
+
+    # Fall back to DB when env vars are not set (OAuth-configured installs)
+    if not plex_url or not plex_token:
+        db: Session = SessionLocal()
+        try:
+            def _get(key: str) -> str:
+                row = db.query(Setting).filter(Setting.key == key).first()
+                return row.value if row else ""
+            if not plex_url:
+                plex_url   = _normalise_url(_get("PLEX_URL"))
+            if not plex_token:
+                plex_token = _get("PLEX_TOKEN")
+        finally:
+            db.close()
+
+    if not plex_url or not plex_token:
+        raise RuntimeError("PLEX_URL and PLEX_TOKEN are not configured.")
+
     return PlexServer(plex_url, plex_token)
 
 

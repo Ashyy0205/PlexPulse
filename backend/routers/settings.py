@@ -47,6 +47,14 @@ def _mask_token(value: str) -> str:
     return "*" * (len(value) - 4) + value[-4:]
 
 
+def _normalise_url(url: str) -> str:
+    """Prepend http:// if the URL has no scheme."""
+    url = url.strip()
+    if url and not url.startswith(("http://", "https://")):
+        url = "http://" + url
+    return url.rstrip("/")
+
+
 def _get_setting(key: str, db: Session) -> str | None:
     row = db.query(Setting).filter(Setting.key == key).first()
     return row.value if row else None
@@ -68,6 +76,7 @@ def _delete_setting(key: str, db: Session) -> None:
 
 def _try_connect(url: str, token: str, db: Session | None = None) -> tuple[bool, str | None]:
     """Attempt a Plex connection. Returns (success, server_name_or_None)."""
+    url = _normalise_url(url)
     parsed = urlparse(url)
     if parsed.scheme not in ("http", "https"):
         raise HTTPException(status_code=400, detail="PLEX_URL must use http or https.")
@@ -107,6 +116,9 @@ def update_settings(body: SettingsUpdateRequest, db: Session = Depends(get_db)):
     updated: list[str] = []
 
     for key, value in body.settings.items():
+        # Normalise Plex URL before storing
+        if key == "PLEX_URL" and value:
+            value = _normalise_url(value)
         row = db.query(Setting).filter(Setting.key == key).first()
         if row is None:
             db.add(Setting(key=key, value=value))
@@ -251,7 +263,7 @@ def poll_plex_oauth(db: Session = Depends(get_db)):
     _delete_setting("PLEX_OAUTH_PIN_CODE", db)
     db.commit()
 
-    plex_url    = _get_setting("PLEX_URL", db) or ""
+    plex_url    = _normalise_url(_get_setting("PLEX_URL", db) or "")
     server_name = None
     if plex_url:
         ok, server_name = _try_connect(plex_url, auth_token, db)
