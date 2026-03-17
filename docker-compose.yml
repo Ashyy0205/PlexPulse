@@ -13,4 +13,6 @@ services:
       - PLEX_TOKEN=${PLEX_TOKEN}
       - COLLECTION_INTERVAL=${COLLECTION_INTERVAL:-6h}
       - TZ=${TZ:-UTC}
-      - MONITOR_PATHS=${MONITOR_PATHS:-/mnt/user}
+      - MONITOR_PATH_MOVIES=${MONITOR_PATH_MOVIES:-/mnt/user/Movies}
+      - MONITOR_PATH_TV=${MONITOR_PATH_TV:-/mnt/user/TV Shows}
+      - MONITOR_PATH_MUSIC=${MONITOR_PATH_MUSIC:-/mnt/user/Music}

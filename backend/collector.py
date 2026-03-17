@@ -98,11 +98,21 @@ def _collect_mounts(plex: PlexServer) -> set[str]:
          inside this container are included.
     """
     # 1. Explicit env-var override
-    monitor_env = os.environ.get("MONITOR_PATHS", "").strip()
-    if monitor_env:
+    # Support both the combined MONITOR_PATHS and the per-library vars
+    # MONITOR_PATH_MOVIES / MONITOR_PATH_TV / MONITOR_PATH_MUSIC set by the
+    # Unraid template.  Merge all of them together.
+    per_lib = [
+        os.environ.get("MONITOR_PATH_MOVIES", "").strip(),
+        os.environ.get("MONITOR_PATH_TV",     "").strip(),
+        os.environ.get("MONITOR_PATH_MUSIC",  "").strip(),
+    ]
+    combined_env = os.environ.get("MONITOR_PATHS", "").strip()
+    raw_paths = [p for p in per_lib + [combined_env] if p]
+    all_paths = [p.strip() for entry in raw_paths for p in entry.split(",") if p.strip()]
+
+    if all_paths:
         mounts: set[str] = set()
-        for raw in monitor_env.split(","):
-            path = raw.strip()
+        for path in all_paths:
             if path and os.path.exists(path):
                 mounts.add(_resolve_mount(path))
             elif path:
