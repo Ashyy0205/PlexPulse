@@ -1,3 +1,4 @@
+import glob
 import logging
 import os
 import shutil
@@ -89,30 +90,17 @@ def _collect_mounts(plex: PlexServer) -> set[str]:
     Return the set of mount points to snapshot disk usage for.
 
     Priority order:
-      1. MONITOR_PATHS env var — comma-separated list of paths the user wants
-         to track (e.g. "/mnt/user,/mnt/cache").  These are used as-is if they
-         exist inside the container.
-      2. /mnt/user — the Unraid merged-array path, used automatically when
-         present (covers the common Unraid case without any config).
-      3. Plex library locations — only paths that are actually accessible
-         inside this container are included.
+      1. MONITOR_PATHS env var — comma-separated explicit override.
+      2. Unraid auto-detect — scans /mnt/disk* for mounted data disks.
+         Parity has no filesystem so it never appears here. Cache is excluded.
+      3. Plex library locations — only paths accessible inside the container.
     """
     # 1. Explicit env-var override
-    # Support both the combined MONITOR_PATHS and the per-library vars
-    # MONITOR_PATH_MOVIES / MONITOR_PATH_TV / MONITOR_PATH_MUSIC set by the
-    # Unraid template.  Merge all of them together.
-    per_lib = [
-        os.environ.get("MONITOR_PATH_MOVIES", "").strip(),
-        os.environ.get("MONITOR_PATH_TV",     "").strip(),
-        os.environ.get("MONITOR_PATH_MUSIC",  "").strip(),
-    ]
-    combined_env = os.environ.get("MONITOR_PATHS", "").strip()
-    raw_paths = [p for p in per_lib + [combined_env] if p]
-    all_paths = [p.strip() for entry in raw_paths for p in entry.split(",") if p.strip()]
-
-    if all_paths:
+    monitor_env = os.environ.get("MONITOR_PATHS", "").strip()
+    if monitor_env:
         mounts: set[str] = set()
-        for path in all_paths:
+        for raw in monitor_env.split(","):
+            path = raw.strip()
             if path and os.path.exists(path):
                 mounts.add(_resolve_mount(path))
             elif path:
@@ -120,10 +108,16 @@ def _collect_mounts(plex: PlexServer) -> set[str]:
         if mounts:
             return mounts
 
-    # 2. Unraid default: /mnt/user (merged array view)
-    if os.path.exists("/mnt/user"):
-        log.debug("Using /mnt/user as disk monitor target (Unraid default).")
-        return {_resolve_mount("/mnt/user")}
+    # 2. Unraid: auto-detect individual array disks (/mnt/disk1, /mnt/disk2, ...)
+    #    glob returns e.g. ["/mnt/disk1", "/mnt/disk2", "/mnt/disk3"]
+    #    Only include paths that are actual mount points (formatted, spun-up disks).
+    #    Parity drives have no filesystem and do not appear under /mnt/disk*.
+    unraid_disks = sorted(
+        p for p in glob.glob("/mnt/disk*") if os.path.ismount(p)
+    )
+    if unraid_disks:
+        log.debug("Unraid array disks detected: %s", unraid_disks)
+        return set(unraid_disks)
 
     # 3. Derive from Plex library locations (only paths visible in this container)
     mounts = set()
@@ -142,8 +136,8 @@ def _collect_mounts(plex: PlexServer) -> set[str]:
 
     if not mounts:
         log.warning(
-            "No accessible disk paths found. Set the MONITOR_PATHS environment "
-            "variable (e.g. MONITOR_PATHS=/mnt/user) or mount /mnt into the container."
+            "No accessible disk paths found. Mount /mnt into the container "
+            "(add '/mnt:/mnt:ro' as a volume) so PlexPulse can see Unraid array disks."
         )
 
     return mounts

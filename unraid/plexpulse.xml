@@ -31,17 +31,9 @@
     Description="Optional. Leave blank to sign in via the UI OAuth flow instead."
     Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
 
-  <Config Name="Movies Path" Target="MONITOR_PATH_MOVIES" Default="/mnt/user/Movies"
-    Description="Path to your Movies library on the Unraid array. Used to measure disk usage for Movies. Change to match your actual share name."
-    Type="Variable" Display="always" Required="false" Mask="false">/mnt/user/Movies</Config>
-
-  <Config Name="TV Shows Path" Target="MONITOR_PATH_TV" Default="/mnt/user/TV Shows"
-    Description="Path to your TV Shows library on the Unraid array. Used to measure disk usage for TV Shows. Change to match your actual share name."
-    Type="Variable" Display="always" Required="false" Mask="false">/mnt/user/TV Shows</Config>
-
-  <Config Name="Music Path" Target="MONITOR_PATH_MUSIC" Default="/mnt/user/Music"
-    Description="Path to your Music library on the Unraid array. Used to measure disk usage for Music. Change to match your actual share name."
-    Type="Variable" Display="always" Required="false" Mask="false">/mnt/user/Music</Config>
+  <Config Name="Monitor Paths Override" Target="MONITOR_PATHS" Default=""
+    Description="Optional. Leave blank — PlexPulse automatically detects your Unraid array disks (Disk 1, Disk 2, Disk 3, etc.) via /mnt/disk*. Only set this if you want to override, e.g. /mnt/cache to track cache only, or /mnt/disk1,/mnt/disk2 for specific disks."
+    Type="Variable" Display="advanced" Required="false" Mask="false"></Config>
 
   <Config Name="Collection Interval" Target="COLLECTION_INTERVAL" Default="6h"
     Description="How often to snapshot library stats. Options: 1h, 3h, 6h, 12h, 24h."
