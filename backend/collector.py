@@ -163,7 +163,13 @@ def collect() -> dict:
         # ── Library snapshots ──────────────────────────────────────────────
         for section in sections:
             try:
-                item_count = len(section.all())
+                section_type = getattr(section, "type", "")
+                if section_type == "show":
+                    item_count = len(section.all(libtype="episode"))
+                elif section_type in ("artist", "music"):
+                    item_count = len(section.all(libtype="track"))
+                else:
+                    item_count = len(section.all())
                 total_size = _section_size_bytes(section)
 
                 lib = db.query(Library).filter_by(plex_library_key=str(section.key)).first()
