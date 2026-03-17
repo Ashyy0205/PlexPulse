@@ -168,12 +168,12 @@ function LineCard({ title, color, labels, values, yFmt, loading }) {
       style={{ background: T.card, border: `1px solid ${T.border}` }}>
       <h3 className="text-sm font-semibold mb-4" style={{ color: T.textPrimary }}>{title}</h3>
       <div style={{ height: 200, opacity: loading ? 0.4 : 1, transition: 'opacity 0.2s' }}>
-        {labels.length > 0
+        {labels.length > 1
           ? <Line data={data} options={options} />
           : (
             <div className="h-full flex items-center justify-center text-sm"
               style={{ color: T.textMuted }}>
-              No data for this range.
+              Not enough data to draw a chart yet.
             </div>
           )
         }
@@ -195,6 +195,7 @@ export default function LibraryDetail() {
   const [loading,   setLoading]   = useState(true)
   const [snapLoading, setSnapLoading] = useState(false)
   const [error,     setError]     = useState(null)
+  const [retryKey,  setRetryKey]  = useState(0)
 
   // Fetch library info from the summary libraries list
   useEffect(() => {
@@ -212,7 +213,7 @@ export default function LibraryDetail() {
       })
       .catch(() => setError('Failed to load library.'))
       .finally(() => setLoading(false))
-  }, [numId])
+  }, [numId, retryKey])
 
   // Fetch snapshots whenever range changes
   const fetchSnaps = useCallback(async (r) => {
@@ -235,9 +236,15 @@ export default function LibraryDetail() {
   // ── Derived ────────────────────────────────────────────────────────────────
   if (loading) return <SkeletonDetail />
   if (error) return (
-    <div className="rounded-xl p-6 text-sm"
-      style={{ background: '#ef444415', border: '1px solid #ef4444', color: '#f87171' }}>
-      {error}
+    <div className="rounded-xl p-6 space-y-3"
+      style={{ background: '#ef444415', border: '1px solid #ef4444' }}>
+      <p className="text-sm" style={{ color: '#f87171' }}>{error}</p>
+      <button
+        onClick={() => { setError(null); setLoading(true); setRetryKey(k => k + 1) }}
+        className="px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer"
+        style={{ background: '#ef444430', color: '#f87171' }}>
+        Retry
+      </button>
     </div>
   )
   if (!libInfo) return null

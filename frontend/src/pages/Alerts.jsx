@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import client from '../hooks/useApi'
+import { useToast } from '../components/Toast'
 
 // ── Theme ──────────────────────────────────────────────────────────────────────
 const T = {
@@ -66,6 +67,7 @@ function AlertCard({ rule, onToggle, onDelete, onTest }) {
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [testLoading,   setTestLoading]   = useState(false)
   const [testResult,    setTestResult]    = useState(null)
+  const addToast = useToast()
 
   const handleToggle = async (val) => {
     setToggleLoading(true)
@@ -84,6 +86,7 @@ function AlertCard({ rule, onToggle, onDelete, onTest }) {
     setTestResult(null)
     const result = await onTest(rule.id)
     setTestResult(result)
+    addToast(result.detail, result.success ? 'success' : 'error')
     setTestLoading(false)
   }
 
@@ -321,6 +324,7 @@ export default function Alerts() {
   const [loading,     setLoading]     = useState(true)
   const [error,       setError]       = useState(null)
   const [showAddForm, setShowAddForm] = useState(false)
+  const [retryKey,    setRetryKey]    = useState(0)
 
   useEffect(() => {
     Promise.all([
@@ -334,7 +338,7 @@ export default function Alerts() {
       setError(e?.message ?? 'Failed to load alerts')
       setLoading(false)
     })
-  }, [])
+  }, [retryKey])
 
   const handleToggle = async (id, enabled) => {
     try {
@@ -378,9 +382,15 @@ export default function Alerts() {
   )
 
   if (error) return (
-    <div className="rounded-xl p-6 text-sm"
-      style={{ background: '#ef444415', border: '1px solid #ef4444', color: '#f87171' }}>
-      {error}
+    <div className="rounded-xl p-6 space-y-3"
+      style={{ background: '#ef444415', border: '1px solid #ef4444' }}>
+      <p className="text-sm" style={{ color: '#f87171' }}>{error}</p>
+      <button
+        onClick={() => setRetryKey(k => k + 1)}
+        className="px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer"
+        style={{ background: '#ef444430', color: '#f87171' }}>
+        Retry
+      </button>
     </div>
   )
 

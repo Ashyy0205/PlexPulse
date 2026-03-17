@@ -222,12 +222,12 @@ function FillChart({ snapshots, range, onRangeChange, loading }) {
         </div>
       </div>
       <div style={{ height: 260, opacity: loading ? 0.45 : 1, transition: 'opacity 0.2s' }}>
-        {allTs.length > 0
+        {allTs.length > 1
           ? <Line data={{ labels, datasets }} options={options} />
           : (
             <div className="h-full flex items-center justify-center text-sm"
               style={{ color: T.textMuted }}>
-              No snapshot data for this range.
+              Not enough data to draw a chart yet.
             </div>
           )
         }
@@ -261,7 +261,7 @@ function InfoBox({ intervalLabel }) {
 
 // ── Drives (main) ──────────────────────────────────────────────────────────────
 export default function Drives() {
-  const { data: mounts, loading, error } = useGet('/disk')
+  const { data: mounts, loading, error, refetch } = useGet('/disk')
   const [range,            setRange]            = useState('6m')
   const [snapshots,        setSnapshots]        = useState({})
   const [snapshotsLoading, setSnapshotsLoading] = useState(false)
@@ -299,9 +299,15 @@ export default function Drives() {
 
   if (loading) return <SkeletonDrives />
   if (error) return (
-    <div className="rounded-xl p-6 text-sm"
-      style={{ background: '#ef444415', border: '1px solid #ef4444', color: '#f87171' }}>
-      Failed to load disk data: {error}
+    <div className="rounded-xl p-6 space-y-3"
+      style={{ background: '#ef444415', border: '1px solid #ef4444' }}>
+      <p className="text-sm" style={{ color: '#f87171' }}>Failed to load disk data: {error}</p>
+      <button
+        onClick={refetch}
+        className="px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer"
+        style={{ background: '#ef444430', color: '#f87171' }}>
+        Retry
+      </button>
     </div>
   )
   if (!mounts?.length) return (

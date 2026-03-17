@@ -226,9 +226,9 @@ function BurndownChart({ histData, apiForecast, whatIfPts, range }) {
     },
   }
 
-  return allLbls.length > 0
+  return allLbls.length > 1
     ? <Line data={{ labels: allLbls, datasets }} options={options} plugins={[makeExhaustionPlugin(exhaustLabel)]} />
-    : <div className="h-full flex items-center justify-center text-sm" style={{ color: T.textMuted }}>No data available yet.</div>
+    : <div className="h-full flex items-center justify-center text-sm" style={{ color: T.textMuted }}>Not enough data to draw a chart yet.</div>
 }
 
 // ── Forecast page ─────────────────────────────────────────────────────────────
@@ -240,6 +240,7 @@ export default function Forecast() {
   const [libGrowth,    setLibGrowth]    = useState({})
   const [loading,      setLoading]      = useState(true)
   const [error,        setError]        = useState(null)
+  const [retryKey,     setRetryKey]     = useState(0)
   const [range,        setRange]        = useState('1y')
   const [whatIfGB,     setWhatIfGB]     = useState(0)
   const [addStorageTB, setAddStorageTB] = useState(0)
@@ -269,7 +270,7 @@ export default function Forecast() {
         setLibGrowth(Object.fromEntries(pairs))
       }
     }).catch(e => setError(e.message)).finally(() => setLoading(false))
-  }, [])
+  }, [retryKey])
 
   // Rebuild what-if whenever inputs change
   const primaryDisk = diskMounts.length
@@ -284,9 +285,15 @@ export default function Forecast() {
 
   if (loading) return <SkeletonPage />
   if (error) return (
-    <div className="rounded-xl p-6 text-sm"
-      style={{ background: '#ef444415', border: '1px solid #ef4444', color: '#f87171' }}>
-      Error loading forecast: {error}
+    <div className="rounded-xl p-6 space-y-3"
+      style={{ background: '#ef444415', border: '1px solid #ef4444' }}>
+      <p className="text-sm" style={{ color: '#f87171' }}>Error loading forecast: {error}</p>
+      <button
+        onClick={() => { setError(null); setLoading(true); setRetryKey(k => k + 1) }}
+        className="px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer"
+        style={{ background: '#ef444430', color: '#f87171' }}>
+        Retry
+      </button>
     </div>
   )
 

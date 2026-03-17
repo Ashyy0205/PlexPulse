@@ -12,6 +12,7 @@ import {
 } from 'chart.js'
 import { Line, Doughnut } from 'react-chartjs-2'
 import client, { useGet } from '../hooks/useApi'
+import { useToast } from '../components/Toast'
 
 ChartJS.register(
   CategoryScale, LinearScale, PointElement, LineElement,
@@ -222,9 +223,9 @@ function StorageChart({ libraries, snapshots, range, onRangeChange, loading }) {
         </div>
       </div>
       <div style={{ height: 220, opacity: loading ? 0.45 : 1, transition: 'opacity 0.2s' }}>
-        {allTs.length > 0
+        {allTs.length > 1
           ? <Line data={{ labels, datasets }} options={options} />
-          : <Empty>No snapshot data for this range.</Empty>
+          : <Empty>Not enough data to draw a chart yet.</Empty>
         }
       </div>
     </div>
@@ -419,9 +420,9 @@ function BurndownChart({ diskSnapshots, forecast, daysRemaining }) {
       )}
 
       <div style={{ height: 260 }}>
-        {allLabels.length > 0
+        {allLabels.length > 1
           ? <Line data={{ labels: allLabels, datasets }} options={options} />
-          : <Empty>No disk snapshot data yet.</Empty>
+          : <Empty>Not enough data to draw a chart yet.</Empty>
         }
       </div>
     </div>
@@ -438,13 +439,15 @@ function Empty({ children }) {
 
 // ── Dashboard ────────────────────────────────────────────────────────────────
 export default function Dashboard() {
-  const { data: summary, loading, error } = useGet('/summary')
+  const { data: summary, loading, error, refetch } = useGet('/summary')
   const [range,            setRange]            = useState('6m')
   const [librarySnapshots, setLibrarySnapshots] = useState({})
   const [diskSnapshots,    setDiskSnapshots]    = useState([])
   const [diskForecast,     setDiskForecast]     = useState(null)
   const [growthData,       setGrowthData]       = useState({})
   const [snapshotsLoading, setSnapshotsLoading] = useState(false)
+  const addToast = useToast()
+  const [collectingNow, setCollectingNow] = useState(false)
 
   // Per-library growth stats
   useEffect(() => {
@@ -490,16 +493,61 @@ export default function Dashboard() {
     ]).then(([snaps, fc]) => { setDiskSnapshots(snaps); setDiskForecast(fc) })
   }, [summary?.disk_mounts])
 
+  const handleCollect = async () => {
+    setCollectingNow(true)
+    try {
+      const res = await client.post('/collect')
+      addToast(
+        `Collection done — ${res.data.libraries_snapshotted ?? 0} librar${res.data.libraries_snapshotted !== 1 ? 'ies' : 'y'} snapshotted`,
+        'success',
+      )
+      refetch()
+    } catch (e) {
+      addToast('Collection failed: ' + (e?.response?.data?.detail ?? e.message), 'error')
+    } finally {
+      setCollectingNow(false)
+    }
+  }
+
   if (loading) return <SkeletonDashboard />
   if (error) return (
-    <div className="rounded-xl p-6 text-sm"
-      style={{ background: '#ef444415', border: '1px solid #ef4444', color: '#f87171' }}>
-      Failed to load dashboard: {error}
+    <div className="rounded-xl p-6 space-y-3"
+      style={{ background: '#ef444415', border: '1px solid #ef4444' }}>
+      <p className="text-sm" style={{ color: '#f87171' }}>Failed to load dashboard: {error}</p>
+      <button
+        onClick={refetch}
+        className="px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer"
+        style={{ background: '#ef444430', color: '#f87171' }}>
+        Retry
+      </button>
     </div>
   )
   if (!summary) return null
 
   const { libraries = [], disk_mounts = [], primary_mount_forecast, days_remaining } = summary
+
+  const hasData = disk_mounts.length > 0 || libraries.some(l => l.item_count != null)
+  if (!hasData) {
+    return (
+      <div className="rounded-xl p-10 flex flex-col items-center gap-5 text-center"
+        style={{ background: T.card, border: `1px solid ${T.border}` }}>
+        <div className="text-4xl">📦</div>
+        <div className="space-y-2">
+          <h3 className="text-lg font-semibold" style={{ color: T.textPrimary }}>No snapshots yet</h3>
+          <p className="text-sm max-w-xs" style={{ color: T.textMuted }}>
+            PlexPulse collects data on a schedule. Click below to collect your first snapshot.
+          </p>
+        </div>
+        <button
+          onClick={handleCollect}
+          disabled={collectingNow}
+          className="px-5 py-2.5 rounded-lg text-sm font-semibold cursor-pointer disabled:opacity-50"
+          style={{ background: T.accent, color: '#000' }}>
+          {collectingNow ? '⟳ Running…' : 'Run Collection Now'}
+        </button>
+      </div>
+    )
+  }
 
   const totalDiskUsed = disk_mounts.reduce((s, d) => s + d.used_bytes, 0)
   const primaryDisk   = disk_mounts.length

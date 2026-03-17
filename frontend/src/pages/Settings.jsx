@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
 import client from '../hooks/useApi'
+import { useToast } from '../components/Toast'
 
 // ── Theme ──────────────────────────────────────────────────────────────────────
 const T = {
@@ -114,6 +115,7 @@ export default function Settings() {
   const [saveStatus,      setSaveStatus]      = useState(null)
   const [testStatus,      setTestStatus]      = useState(null)
   const [collectStatus,   setCollectStatus]   = useState(null)
+  const addToast = useToast()
 
   useEffect(() => {
     Promise.all([
@@ -180,13 +182,16 @@ export default function Settings() {
       const d = res.data
       if (d.plex_reconnected && d.plex_connection_ok === false) {
         setSaveStatus('plex_warn')
+        addToast('Settings saved — Plex connection test failed', 'info')
       } else {
         setSaveStatus('ok')
+        addToast('Settings saved', 'success')
       }
       setTokenChanged(false)
       setTimeout(() => setSaveStatus(null), 4000)
     } catch (e) {
       setSaveStatus({ error: e?.response?.data?.detail ?? e.message })
+      addToast('Save failed: ' + (e?.response?.data?.detail ?? e.message), 'error')
     }
   }
 
@@ -195,9 +200,14 @@ export default function Settings() {
     try {
       const res = await client.post('/collect')
       setCollectStatus(res.data)
+      addToast(
+        `Collection done — ${res.data.libraries_snapshotted ?? 0} librar${res.data.libraries_snapshotted !== 1 ? 'ies' : 'y'} snapshotted`,
+        'success',
+      )
       setTimeout(() => setCollectStatus(null), 6000)
     } catch (e) {
       setCollectStatus({ error: e?.response?.data?.detail ?? e.message })
+      addToast('Collection failed: ' + (e?.response?.data?.detail ?? e.message), 'error')
     }
   }
 
