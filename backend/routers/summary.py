@@ -73,6 +73,7 @@ def _build_forecast(mount_point: str, db: Session) -> DiskForecast:
         db.query(DiskSnapshot)
         .filter(DiskSnapshot.mount_point == mount_point)
         .order_by(DiskSnapshot.captured_at.asc())
+        .limit(5000)
         .all()
     )
 
@@ -180,6 +181,7 @@ def _combined_monthly_growth(db: Session) -> float:
             db.query(Snapshot)
             .filter(Snapshot.library_id == lib.id)
             .order_by(Snapshot.captured_at.asc())
+            .limit(5000)
             .all()
         )
         if len(rows) < 2:

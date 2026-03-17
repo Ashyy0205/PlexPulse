@@ -6,6 +6,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -45,6 +46,11 @@ class Snapshot(Base):
     library = relationship("Library", back_populates="snapshots")
 
 
+# Composite index for the most common query pattern: filter by library + sort/range by captured_at
+_ix_snapshots = Index("ix_snapshots_library_captured", "library_id", "captured_at")
+Snapshot.__table__.append_constraint(_ix_snapshots)
+
+
 class DiskSnapshot(Base):
     __tablename__ = "disk_snapshots"
 
@@ -54,6 +60,11 @@ class DiskSnapshot(Base):
     total_bytes = Column(Integer, nullable=False)
     used_bytes = Column(Integer, nullable=False)
     free_bytes = Column(Integer, nullable=False)
+
+
+# Composite index for the most common query pattern: filter by mount + sort/range by captured_at
+_ix_disk_snapshots = Index("ix_disk_snapshots_mount_captured", "mount_point", "captured_at")
+DiskSnapshot.__table__.append_constraint(_ix_disk_snapshots)
 
 
 class Setting(Base):

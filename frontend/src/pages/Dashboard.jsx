@@ -58,6 +58,14 @@ const CHART_TOOLTIP = {
   bodyColor:       '#f0ede4',
 }
 
+// Smart byte formatter — picks appropriate unit
+function fmtBytes(bytes) {
+  if (bytes == null) return '—'
+  if (bytes >= 1e12) return `${(bytes / 1e12).toFixed(2)} TB`
+  if (bytes >= 1e9)  return `${(bytes / 1e9).toFixed(1)} GB`
+  return `${Math.round(bytes / 1e6)} MB`
+}
+
 // ── Skeleton ─────────────────────────────────────────────────────────────────
 function Sk({ className = '' }) {
   return <div className={`animate-pulse rounded bg-[#1e1e24] ${className}`} />
@@ -151,7 +159,7 @@ function LibraryDonut({ library, totalDiskUsed, growth }) {
         <Doughnut data={donutData} options={donutOpts} />
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
           <span className="text-sm font-bold tabular-nums" style={{ color: T.textPrimary }}>
-            {fmtTB(libBytes)} TB
+            {fmtBytes(libBytes)}
           </span>
         </div>
       </div>
@@ -565,7 +573,7 @@ export default function Dashboard() {
     return n != null ? `+${Math.round(n)} added/month` : 'Trend pending'
   }
 
-  const freeSpaceTB = primaryDisk ? `${fmtTB(primaryDisk.free_bytes)} TB` : '—'
+  const freeSpaceTB = primaryDisk ? fmtBytes(primaryDisk.free_bytes) : '—'
   const freeSub     = days_remaining != null
     ? `~${Math.round(days_remaining / 30)} months remaining`
     : 'Forecast pending'

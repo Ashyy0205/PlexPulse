@@ -2,17 +2,9 @@ import { Outlet, NavLink } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import axios from 'axios'
 
-const NAV = [
+const STATIC_NAV = [
   { label: 'Dashboard', to: '/', icon: '⊞' },
-  {
-    label: 'Libraries',
-    icon: '▤',
-    children: [
-      { label: 'Movies',   to: '/library/movies' },
-      { label: 'TV Shows', to: '/library/shows' },
-      { label: 'Music',    to: '/library/music' },
-    ],
-  },
+  // Libraries section is built dynamically from the API (see Shell component)
   { label: 'Forecast',  to: '/forecast',  icon: '◈' },
   { label: 'Drives',    to: '/drives',    icon: '◫' },
   { label: 'Alerts',    to: '/alerts',    icon: '◉' },
@@ -77,6 +69,7 @@ function NavItem({ item }) {
 
 export default function Shell() {
   const [connected, setConnected] = useState(false)
+  const [navLibraries, setNavLibraries] = useState([])
 
   useEffect(() => {
     const check = () =>
@@ -88,6 +81,22 @@ export default function Shell() {
     return () => clearInterval(id)
   }, [])
 
+  useEffect(() => {
+    axios.get('/api/v1/libraries')
+      .then(r => setNavLibraries(r.data || []))
+      .catch(() => {})
+  }, [])
+
+  const nav = [
+    STATIC_NAV[0], // Dashboard
+    {
+      label: 'Libraries',
+      icon: '▤',
+      children: navLibraries.map(l => ({ label: l.name, to: `/library/${l.id}` })),
+    },
+    ...STATIC_NAV.slice(1), // Forecast, Drives, Alerts, Settings
+  ]
+
   return (
     <div className="flex h-screen overflow-hidden bg-surface text-zinc-100">
       {/* Sidenav */}
@@ -97,7 +106,7 @@ export default function Shell() {
         </div>
         <nav className="flex-1 overflow-y-auto p-3">
           <ul className="space-y-0.5">
-            {NAV.map(item => (
+            {nav.map(item => (
               <NavItem key={item.label} item={item} />
             ))}
           </ul>

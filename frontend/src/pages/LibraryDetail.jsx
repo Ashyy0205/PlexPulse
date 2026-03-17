@@ -45,9 +45,15 @@ const CHART_TOOLTIP = {
 const fmtDate   = iso => iso
   ? new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' })
   : ''
-const fmtTB     = b  => b != null ? (b / 1e12).toFixed(3) : '—'
 const fmtGB     = b  => b != null ? (b / 1e9).toFixed(1)  : '—'
 const fmtMB     = b  => b != null ? (b / 1e6).toFixed(0)  : '—'
+
+function fmtBytes(bytes) {
+  if (bytes == null) return '—'
+  if (bytes >= 1e12) return `${(bytes / 1e12).toFixed(2)} TB`
+  if (bytes >= 1e9)  return `${(bytes / 1e9).toFixed(1)} GB`
+  return `${Math.round(bytes / 1e6)} MB`
+}
 
 function typeLabel(type) {
   return { movie: 'Movies', show: 'TV Shows', artist: 'Music', music: 'Music' }[type] ?? type
@@ -231,7 +237,7 @@ export default function LibraryDetail() {
 
   useEffect(() => { fetchSnaps(range) }, [range, fetchSnaps])
 
-  const handleRangeChange = r => { setRange(r); fetchSnaps(r) }
+  const handleRangeChange = r => setRange(r)
 
   // ── Derived ────────────────────────────────────────────────────────────────
   if (loading) return <SkeletonDetail />
@@ -278,7 +284,7 @@ export default function LibraryDetail() {
             </span>
           </div>
           <p className="text-sm" style={{ color: T.textMuted }}>
-            {latestCount.toLocaleString()} items &nbsp;·&nbsp; {fmtTB(latestBytes)} TB
+            {latestCount.toLocaleString()} items &nbsp;·&nbsp; {fmtBytes(latestBytes)}
           </p>
         </div>
         <RangeTabs range={range} onChange={handleRangeChange} />

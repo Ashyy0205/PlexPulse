@@ -117,7 +117,7 @@ def get_disk_snapshots(
         cutoff = datetime.now(timezone.utc) - timedelta(days=days)
         query = query.filter(DiskSnapshot.captured_at >= cutoff)
 
-    rows = query.order_by(DiskSnapshot.captured_at.asc()).all()
+    rows = query.order_by(DiskSnapshot.captured_at.asc()).limit(5000).all()
     if not rows:
         raise HTTPException(status_code=404, detail=f"No disk snapshots found for mount '{mount}'.")
 
@@ -142,6 +142,7 @@ def get_disk_forecast(
         db.query(DiskSnapshot)
         .filter(DiskSnapshot.mount_point == mount)
         .order_by(DiskSnapshot.captured_at.asc())
+        .limit(5000)
         .all()
     )
     if not rows:

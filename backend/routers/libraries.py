@@ -49,6 +49,11 @@ _RANGE_DAYS: dict[str, int | None] = {
 }
 
 
+def _ensure_aware(dt: datetime) -> datetime:
+    """Ensure a datetime is UTC-aware (SQLite returns naive datetimes)."""
+    return dt if dt.tzinfo is not None else dt.replace(tzinfo=timezone.utc)
+
+
 def _get_library_or_404(library_id: int, db: Session) -> Library:
     lib = db.query(Library).filter(Library.id == library_id).first()
     if lib is None:
@@ -80,7 +85,7 @@ def list_libraries(db: Session = Depends(get_db)):
                 type=lib.type,
                 item_count=snap.item_count if snap else None,
                 total_size_bytes=snap.total_size_bytes if snap else None,
-                last_captured_at=snap.captured_at if snap else None,
+                last_captured_at=_ensure_aware(snap.captured_at) if snap else None,
             )
         )
     return results
@@ -104,10 +109,10 @@ def get_snapshots(
         cutoff = datetime.now(timezone.utc) - timedelta(days=days)
         query = query.filter(Snapshot.captured_at >= cutoff)
 
-    rows = query.order_by(Snapshot.captured_at.asc()).all()
+    rows = query.order_by(Snapshot.captured_at.asc()).limit(5000).all()
     return [
         SnapshotPoint(
-            captured_at=row.captured_at,
+            captured_at=_ensure_aware(row.captured_at),
             item_count=row.item_count,
             total_size_bytes=row.total_size_bytes,
         )
@@ -123,6 +128,7 @@ def get_growth(library_id: int, db: Session = Depends(get_db)):
         db.query(Snapshot)
         .filter(Snapshot.library_id == library_id)
         .order_by(Snapshot.captured_at.asc())
+        .limit(5000)
         .all()
     )
 

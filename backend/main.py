@@ -5,12 +5,14 @@ from datetime import datetime, timezone
 from urllib.parse import urlparse
 
 from fastapi import Depends, FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from plexapi.exceptions import Unauthorized
 from plexapi.server import PlexServer
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from starlette.requests import Request
 
 from database import create_tables, get_db
 from models import DiskSnapshot, Library, Snapshot
@@ -91,6 +93,19 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="PlexPulse", version="0.1.0", lifespan=lifespan)
 
+
+# ── Consistent error shape ─────────────────────────────────────────────────────
+
+@app.exception_handler(HTTPException)
+async def _http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
+    detail = exc.detail if isinstance(exc.detail, str) else str(exc.detail)
+    return JSONResponse(status_code=exc.status_code, content={"error": detail, "detail": detail})
+
+
+@app.exception_handler(RequestValidationError)
+async def _validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    return JSONResponse(status_code=422, content={"error": "Validation error", "detail": exc.errors()})
+
 app.include_router(libraries_router)
 app.include_router(disk_router)
 app.include_router(summary_router)
@@ -115,6 +130,16 @@ def status(db: Session = Depends(get_db)):
         "library_count": library_count,
         "snapshot_collected": snapshot_taken,
     }
+
+
+@app.post("/api/v1/collect")
+def trigger_collect():
+    """Manually trigger a collection snapshot."""
+    try:
+        result = collect()
+        return result
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @app.get("/api/v1/stats")

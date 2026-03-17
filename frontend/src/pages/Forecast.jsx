@@ -41,8 +41,14 @@ const fmtDate = iso => iso
 const fmtDateLong = iso => iso
   ? new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
   : ''
-const fmtTB = b => b != null ? `${(b / 1e12).toFixed(2)} TB` : '—'
 const fmtGB = (b, dp = 1) => b != null ? (b / 1e9).toFixed(dp) : '—'
+
+function fmtBytes(bytes) {
+  if (bytes == null) return '—'
+  if (bytes >= 1e12) return `${(bytes / 1e12).toFixed(2)} TB`
+  if (bytes >= 1e9)  return `${(bytes / 1e9).toFixed(1)} GB`
+  return `${Math.round(bytes / 1e6)} MB`
+}
 
 // ── Exhaustion vertical line plugin (per-chart, no global registration) ────────
 function makeExhaustionPlugin(exhaustLabel) {
@@ -493,7 +499,7 @@ export default function Forecast() {
                     <tr key={row.id} style={{ borderTop: `1px solid ${T.border}` }}>
                       <td className="py-3" style={{ color: T.textPrimary }}>{row.name}</td>
                       <td className="py-3 text-right tabular-nums" style={{ color: T.textMuted }}>
-                        {fmtTB(row.total_size_bytes)}
+                        {fmtBytes(row.total_size_bytes)}
                       </td>
                       <td className="py-3 text-right tabular-nums font-medium" style={{ color: T.accent }}>
                         +{row.monthlyGB.toFixed(1)} GB
