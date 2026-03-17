@@ -1,0 +1,39 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>PlexPulse</Name>
+  <Repository>ghcr.io/ashyy0205/plexpulse:latest</Repository>
+  <Registry>https://ghcr.io</Registry>
+  <Network>bridge</Network>
+  <Shell>bash</Shell>
+  <Privileged>false</Privileged>
+  <Overview>Self-hosted analytics dashboard for Plex Media Server. Track library growth, storage usage, and get a forecast of when you need more drives. Sign in with Plex directly from the UI.</Overview>
+  <WebUI>http://[IP]:[PORT:7878]</WebUI>
+  <Icon>https://raw.githubusercontent.com/ashyy0205/plexpulse/main/unraid/plexpulse-icon.png</Icon>
+  <ExtraParams>--restart=unless-stopped</ExtraParams>
+
+  <Config Name="Web UI Port" Target="7878" Default="7878" Mode="tcp"
+    Description="Port for the PlexPulse web interface."
+    Type="Port" Display="always" Required="true" Mask="false">7878</Config>
+
+  <Config Name="Data Path" Target="/data" Default="/mnt/user/appdata/plexpulse" Mode="rw"
+    Description="Persistent storage for the PlexPulse database. Use your appdata share."
+    Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/plexpulse</Config>
+
+  <Config Name="Plex Server URL" Target="PLEX_URL" Default=""
+    Description="Optional. e.g. http://192.168.1.50:32400 — leave blank to set via the UI instead. Do not use localhost if Plex is on the same machine, use the LAN IP."
+    Type="Variable" Display="always" Required="false" Mask="false"></Config>
+
+  <Config Name="Plex Token" Target="PLEX_TOKEN" Default=""
+    Description="Optional. Leave blank to sign in via the UI OAuth flow instead."
+    Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+
+  <Config Name="Collection Interval" Target="COLLECTION_INTERVAL" Default="6h"
+    Description="How often to snapshot library stats. Options: 1h, 3h, 6h, 12h, 24h."
+    Type="Variable" Display="always" Required="false" Mask="false">6h</Config>
+
+  <Config Name="Timezone" Target="TZ" Default="Europe/London"
+    Description="TZ database name for correct timestamps, e.g. America/New_York, Europe/London."
+    Type="Variable" Display="always" Required="false" Mask="false">Europe/London</Config>
+
+</Container>
+
