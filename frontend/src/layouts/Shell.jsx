@@ -1,6 +1,6 @@
-import { Outlet, NavLink, useLocation } from 'react-router-dom'
+import { Outlet, NavLink } from 'react-router-dom'
 import { useState, useEffect } from 'react'
-import { useGet } from '../hooks/useApi'
+import axios from 'axios'
 
 const NAV = [
   { label: 'Dashboard', to: '/', icon: '⊞' },
@@ -8,32 +8,29 @@ const NAV = [
     label: 'Libraries',
     icon: '▤',
     children: [
-      { label: 'Movies', to: '/library/movies' },
+      { label: 'Movies',   to: '/library/movies' },
       { label: 'TV Shows', to: '/library/shows' },
-      { label: 'Music', to: '/library/music' },
+      { label: 'Music',    to: '/library/music' },
     ],
   },
-  { label: 'Forecast', to: '/forecast', icon: '◈' },
-  { label: 'Drives', to: '/drives', icon: '◫' },
-  { label: 'Alerts', to: '/alerts', icon: '◉' },
-  { label: 'Settings', to: '/settings', icon: '⚙' },
+  { label: 'Forecast',  to: '/forecast',  icon: '◈' },
+  { label: 'Drives',    to: '/drives',    icon: '◫' },
+  { label: 'Alerts',    to: '/alerts',    icon: '◉' },
+  { label: 'Settings',  to: '/settings',  icon: '⚙' },
 ]
 
 function StatusPill({ connected }) {
   return (
     <span className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full
       bg-surface-raised border border-surface-border">
-      <span
-        className={`inline-block w-2 h-2 rounded-full ${connected ? 'bg-green-400' : 'bg-zinc-500'}`}
-      />
+      <span className={`inline-block w-2 h-2 rounded-full ${connected ? 'bg-green-400' : 'bg-zinc-500'}`} />
       {connected ? 'Plex Connected' : 'Plex Offline'}
     </span>
   )
 }
 
-function NavItem({ item, depth = 0 }) {
+function NavItem({ item }) {
   const [open, setOpen] = useState(true)
-  const location = useLocation()
 
   if (item.children) {
     return (
@@ -50,7 +47,7 @@ function NavItem({ item, depth = 0 }) {
         {open && (
           <ul className="ml-6 mt-0.5 space-y-0.5">
             {item.children.map(child => (
-              <NavItem key={child.to} item={child} depth={depth + 1} />
+              <NavItem key={child.to} item={child} />
             ))}
           </ul>
         )}
@@ -79,8 +76,17 @@ function NavItem({ item, depth = 0 }) {
 }
 
 export default function Shell() {
-  const { data: health } = useGet('/health')
-  const connected = health?.plex_connected ?? false
+  const [connected, setConnected] = useState(false)
+
+  useEffect(() => {
+    const check = () =>
+      axios.get('/health')
+        .then(r => setConnected(r.data?.plex_connected ?? false))
+        .catch(() => setConnected(false))
+    check()
+    const id = setInterval(check, 30_000)
+    return () => clearInterval(id)
+  }, [])
 
   return (
     <div className="flex h-screen overflow-hidden bg-surface text-zinc-100">
@@ -100,14 +106,11 @@ export default function Shell() {
 
       {/* Main area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Topbar */}
         <header className="h-14 flex items-center justify-between px-6 border-b border-surface-border
           bg-surface flex-shrink-0">
           <h1 className="text-sm font-semibold text-zinc-300">PlexPulse</h1>
           <StatusPill connected={connected} />
         </header>
-
-        {/* Page content */}
         <main className="flex-1 overflow-y-auto p-6">
           <Outlet />
         </main>
