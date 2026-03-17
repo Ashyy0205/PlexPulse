@@ -1,14 +1,27 @@
-from sqlmodel import SQLModel, create_engine, Session
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+from models import Base
 
 DATABASE_URL = "sqlite:////data/plexpulse.db"
 
-engine = create_engine(DATABASE_URL)
+engine = create_engine(
+    DATABASE_URL,
+    connect_args={"check_same_thread": False},  # required for SQLite + FastAPI
+)
+
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
-def init_db():
-    SQLModel.metadata.create_all(engine)
+def create_tables() -> None:
+    """Create all tables if they don't already exist."""
+    Base.metadata.create_all(bind=engine)
 
 
-def get_session():
-    with Session(engine) as session:
-        yield session
+def get_db():
+    """FastAPI dependency that yields a database session."""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
