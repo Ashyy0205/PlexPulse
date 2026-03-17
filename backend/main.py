@@ -2,10 +2,11 @@ import logging
 import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
-
 from urllib.parse import urlparse
 
 from fastapi import Depends, FastAPI, HTTPException
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from plexapi.exceptions import Unauthorized
 from plexapi.server import PlexServer
 from pydantic import BaseModel
@@ -147,4 +148,21 @@ def test_plex_connection(body: _TestConnectionBody):
         return {"ok": False, "detail": "Invalid Plex token."}
     except Exception as exc:  # noqa: BLE001
         return {"ok": False, "detail": str(exc)}
+
+
+# ── Static files + SPA catch-all ──────────────────────────────────────────────
+# Must be mounted AFTER all API routes so /api/* is never shadowed.
+_STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
+
+if os.path.isdir(_STATIC_DIR):
+    # Serve hashed assets (JS/CSS chunks) directly
+    app.mount("/assets", StaticFiles(directory=os.path.join(_STATIC_DIR, "assets")), name="assets")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    def spa_fallback(full_path: str):
+        """Return index.html for any path that isn't a known API route."""
+        file_path = os.path.join(_STATIC_DIR, full_path)
+        if os.path.isfile(file_path):
+            return FileResponse(file_path)
+        return FileResponse(os.path.join(_STATIC_DIR, "index.html"))
 
